@@ -1,17 +1,19 @@
+export type NumericFieldValue = number | '';
+
 export interface BuyPosition {
   type: 'Call' | 'Put';
   ticker: string;
-  contracts: number;
-  premium: number; // per share
-  miscFees: number; // total
-  commissions: number; // total
+  contracts: NumericFieldValue;
+  premium: NumericFieldValue; // per share
+  miscFees: NumericFieldValue; // total
+  commissions: NumericFieldValue; // total
   multiplier: number;
 }
 
 export interface SellPosition {
   id: string;
-  contracts: number;
-  premium: number; // per share
-  miscFees: number; // total
-  commissions: number; // total
+  contracts: NumericFieldValue;
+  premium: NumericFieldValue; // per share
+  miscFees: NumericFieldValue; // total
+  commissions: NumericFieldValue; // total
 }

@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Activity, PieChart, TrendingUp, HelpCircle, Calculator, Pencil } from 'lucide-react';
-import { BuyPosition, SellPosition } from './types';
+import { BuyPosition, NumericFieldValue, SellPosition } from './types';
 import Chart from './components/Chart';
 import { formatCurrency, generateId, getEstimatedOptionsFees } from './utils';
+
+const parseNumericInput = (value: string): NumericFieldValue => {
+  if (value === '') return '';
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? '' : parsed;
+};
+const toNumber = (value: NumericFieldValue): number => value === '' ? 0 : value;
 
 export default function App() {
   const initialBuyFees = getEstimatedOptionsFees(50, 0.97, false);
@@ -40,11 +48,11 @@ export default function App() {
     setExpandedSellId(prev => prev === id ? null : prev);
   };
 
-  const updateBuyPosition = (field: keyof BuyPosition, value: any) => {
+  const updateBuyPosition = (field: keyof BuyPosition, value: NumericFieldValue) => {
     setBuyPosition(prev => {
       const updated = { ...prev, [field]: value };
       if (field === 'contracts' || field === 'premium') {
-        const fees = getEstimatedOptionsFees(updated.contracts, updated.premium, false);
+        const fees = getEstimatedOptionsFees(toNumber(updated.contracts), toNumber(updated.premium), false);
         updated.miscFees = fees.miscFees;
         updated.commissions = fees.commissions;
       }
@@ -52,12 +60,12 @@ export default function App() {
     });
   };
 
-  const updateSell = (id: string, field: keyof SellPosition, value: number) => {
+  const updateSell = (id: string, field: keyof SellPosition, value: NumericFieldValue) => {
     setSells(sells.map(s => {
       if (s.id === id) {
         const updated = { ...s, [field]: value };
         if (field === 'contracts' || field === 'premium') {
-          const fees = getEstimatedOptionsFees(updated.contracts, updated.premium, true);
+          const fees = getEstimatedOptionsFees(toNumber(updated.contracts), toNumber(updated.premium), true);
           updated.miscFees = fees.miscFees;
           updated.commissions = fees.commissions;
         }
@@ -68,7 +76,7 @@ export default function App() {
   };
 
   const applyEstimatedFees = () => {
-    const buyFees = getEstimatedOptionsFees(buyPosition.contracts, buyPosition.premium, false);
+    const buyFees = getEstimatedOptionsFees(toNumber(buyPosition.contracts), toNumber(buyPosition.premium), false);
     setBuyPosition({
       ...buyPosition,
       miscFees: buyFees.miscFees,
@@ -76,7 +84,7 @@ export default function App() {
     });
     
     setSells(sells.map(sell => {
-      const sellFees = getEstimatedOptionsFees(sell.contracts, sell.premium, true);
+      const sellFees = getEstimatedOptionsFees(toNumber(sell.contracts), toNumber(sell.premium), true);
       return {
         ...sell,
         miscFees: sellFees.miscFees,
@@ -85,40 +93,44 @@ export default function App() {
     }));
   };
 
-  const buyTradeValue = (buyPosition.contracts * buyPosition.premium * buyPosition.multiplier);
-  const safeBuyMiscFees = Math.abs(Number(buyPosition.miscFees || 0));
-  const safeBuyCommissions = Math.abs(Number(buyPosition.commissions || 0));
+  const buyContracts = toNumber(buyPosition.contracts);
+  const buyPremium = toNumber(buyPosition.premium);
+  const buyTradeValue = (buyContracts * buyPremium * buyPosition.multiplier);
+  const safeBuyMiscFees = Math.abs(toNumber(buyPosition.miscFees));
+  const safeBuyCommissions = Math.abs(toNumber(buyPosition.commissions));
   const totalBuyFees = safeBuyMiscFees + safeBuyCommissions;
   
   const displayPrincipal = buyTradeValue;
   const displayCostBasis = buyTradeValue + totalBuyFees;
   
-  const costPerContract = buyPosition.contracts > 0 ? buyTradeValue / buyPosition.contracts : 0;
-  const buyFeePerContract = buyPosition.contracts > 0 ? totalBuyFees / buyPosition.contracts : 0;
+  const costPerContract = buyContracts > 0 ? buyTradeValue / buyContracts : 0;
+  const buyFeePerContract = buyContracts > 0 ? totalBuyFees / buyContracts : 0;
 
   let totalSoldContracts = 0;
   let totalRealizedProfit = 0;
 
   const sellsWithProfit = sells.map(sell => {
-    const sellTradeValue = (sell.contracts * sell.premium * buyPosition.multiplier);
-    const safeSellMiscFees = Math.abs(Number(sell.miscFees || 0));
-    const safeSellCommissions = Math.abs(Number(sell.commissions || 0));
+    const sellContracts = toNumber(sell.contracts);
+    const sellPremium = toNumber(sell.premium);
+    const sellTradeValue = (sellContracts * sellPremium * buyPosition.multiplier);
+    const safeSellMiscFees = Math.abs(toNumber(sell.miscFees));
+    const safeSellCommissions = Math.abs(toNumber(sell.commissions));
     const sellFees = safeSellMiscFees + safeSellCommissions;
 
-    const allocatedBuyCost = sell.contracts * costPerContract;
-    const allocatedBuyFees = sell.contracts * buyFeePerContract;
+    const allocatedBuyCost = sellContracts * costPerContract;
+    const allocatedBuyFees = sellContracts * buyFeePerContract;
     
     const profit = sellTradeValue - allocatedBuyCost - sellFees - allocatedBuyFees;
     const allocatedCapital = allocatedBuyCost + allocatedBuyFees;
     const roi = allocatedCapital > 0 ? (profit / allocatedCapital) * 100 : 0;
     
-    totalSoldContracts += sell.contracts;
+    totalSoldContracts += sellContracts;
     totalRealizedProfit += profit;
     
     return { ...sell, profit, roi, proceeds: sellTradeValue };
   });
 
-  const remainingContracts = Math.max(0, buyPosition.contracts - totalSoldContracts);
+  const remainingContracts = Math.max(0, buyContracts - totalSoldContracts);
   const totalCapitalInvested = buyTradeValue + totalBuyFees;
   const totalReturnPercentage = totalCapitalInvested > 0 ? (totalRealizedProfit / totalCapitalInvested) * 100 : 0;
 
@@ -183,7 +195,7 @@ export default function App() {
                   type="number" 
                   min="1"
                   value={buyPosition.contracts}
-                  onChange={e => updateBuyPosition('contracts', Number(e.target.value))}
+                  onChange={e => updateBuyPosition('contracts', parseNumericInput(e.target.value))}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm font-mono text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
                 />
               </div>
@@ -193,7 +205,7 @@ export default function App() {
                   type="number" 
                   step="0.01"
                   value={buyPosition.premium}
-                  onChange={e => updateBuyPosition('premium', Number(e.target.value))}
+                  onChange={e => updateBuyPosition('premium', parseNumericInput(e.target.value))}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm font-mono text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
                 />
               </div>
@@ -203,7 +215,7 @@ export default function App() {
                   type="number" 
                   step="0.01"
                   value={buyPosition.miscFees}
-                  onChange={e => updateBuyPosition('miscFees', Number(e.target.value))}
+                  onChange={e => updateBuyPosition('miscFees', parseNumericInput(e.target.value))}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm font-mono text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
                 />
               </div>
@@ -213,7 +225,7 @@ export default function App() {
                   type="number" 
                   step="0.01"
                   value={buyPosition.commissions}
-                  onChange={e => updateBuyPosition('commissions', Number(e.target.value))}
+                  onChange={e => updateBuyPosition('commissions', parseNumericInput(e.target.value))}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm font-mono text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
                 />
               </div>
@@ -263,7 +275,7 @@ export default function App() {
                             <div className="text-xs font-medium text-zinc-500">Execution #{executionNumber}</div>
                             <div className="h-1 w-1 rounded-full bg-zinc-700" />
                             <div className="text-xs text-zinc-500">
-                              {sell.contracts} @ {formatCurrency(sell.premium)}
+                              {toNumber(sell.contracts)} @ {formatCurrency(toNumber(sell.premium))}
                             </div>
                           </div>
                           <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -315,7 +327,7 @@ export default function App() {
                         <input 
                           type="number" 
                           value={sell.contracts}
-                          onChange={e => updateSell(sell.id, 'contracts', Number(e.target.value))}
+                          onChange={e => updateSell(sell.id, 'contracts', parseNumericInput(e.target.value))}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-2 text-sm font-mono text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
                         />
                       </div>
@@ -325,7 +337,7 @@ export default function App() {
                           type="number" 
                           step="0.01"
                           value={sell.premium}
-                          onChange={e => updateSell(sell.id, 'premium', Number(e.target.value))}
+                          onChange={e => updateSell(sell.id, 'premium', parseNumericInput(e.target.value))}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-2 text-sm font-mono text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
                         />
                       </div>
@@ -335,7 +347,7 @@ export default function App() {
                           type="number" 
                           step="0.01"
                           value={sell.miscFees}
-                          onChange={e => updateSell(sell.id, 'miscFees', Number(e.target.value))}
+                          onChange={e => updateSell(sell.id, 'miscFees', parseNumericInput(e.target.value))}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-2 text-sm font-mono text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
                         />
                       </div>
@@ -345,7 +357,7 @@ export default function App() {
                           type="number" 
                           step="0.01"
                           value={sell.commissions}
-                          onChange={e => updateSell(sell.id, 'commissions', Number(e.target.value))}
+                          onChange={e => updateSell(sell.id, 'commissions', parseNumericInput(e.target.value))}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-2 text-sm font-mono text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
                         />
                       </div>
