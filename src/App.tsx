@@ -226,7 +226,10 @@ export default function App() {
               </div>
               <div className="flex justify-between items-center">
                 <div className="text-xs text-zinc-500 flex items-center gap-1">
-                  Total Cost Basis <HelpCircle className="w-3 h-3 text-zinc-600" title="Principal + Commissions + Misc Fees" />
+                  Total Cost Basis
+                  <span title="Principal + Commissions + Misc Fees">
+                    <HelpCircle className="w-3 h-3 text-zinc-600" />
+                  </span>
                 </div>
                 <div className="text-xl font-mono tracking-tight text-zinc-100">{formatCurrency(displayCostBasis)}</div>
               </div>
